@@ -1,56 +1,61 @@
+// controllers/clerkWebhooks.js
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import { Webhook } from "svix";
 
+// Connect to MongoDB (safe for Vercel serverless)
+const connectDB = async () => {
+  if (mongoose.connections[0].readyState) return;
+  await mongoose.connect(process.env.MONGODB_URI);
+};
+
 const clerkWebhooks = async (req, res) => {
   try {
-    // Create a svix instance with webhook secret.
+    // Connect to DB first
+    await connectDB();
+
+    // Verify Clerk webhook
     const whook = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
 
-    // Getting Headers
     const headers = {
       "svix-id": req.headers["svix-id"],
       "svix-timestamp": req.headers["svix-timestamp"],
       "svix-signature": req.headers["svix-signature"],
     };
-    // verify headers
+
+    // Will throw if invalid
     await whook.verify(JSON.stringify(req.body), headers);
-    // Getting data from request body
+
     const { data, type } = req.body;
+
     const userData = {
       _id: data.id,
       email: data.email_addresses[0].email_address,
-      username: data.first_name + " " + data.last_name,
+      username: `${data.first_name} ${data.last_name}`,
       image: data.image_url,
     };
-    // Switch Case for different events
 
     switch (type) {
       case "user.created":
-        // Create a new user in the database
         await User.create(userData);
         break;
       case "user.updated":
-        // Update the user in the database
         await User.findByIdAndUpdate(data.id, userData);
         break;
       case "user.deleted":
-        // Delete the user from the database
         await User.findByIdAndDelete(data.id);
         break;
-
       default:
-        break;
+        console.log("🔶 Unhandled event type:", type);
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: "Webhook received and processed successfully",
     });
-
-
   } catch (error) {
-    console.log(error.message);
-    res.json({
+    console.error("❌ Webhook error:", error);
+    res.status(500).json({
       success: false,
       message: error.message,
     });
