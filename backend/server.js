@@ -1,12 +1,13 @@
 import express from 'express';
 import colors from 'colors';
-import "dotenv/config";
+import dotenv from "dotenv";
+
 import cors from 'cors';
 import { clerkMiddleware } from '@clerk/express'
 import connectDB from './configs/db.js';
 import clerkWebhooks from './controllers/clerkWebhooks.js';
 connectDB()
-
+dotenv.config();
 const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(cors());
